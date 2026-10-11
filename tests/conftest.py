@@ -23,7 +23,7 @@ def client():
 def clean_db(client):
     """Every test starts from empty tables."""
     with app.state.pool.connection() as conn:
-        conn.execute("TRUNCATE usage_events, customers CASCADE")
+        conn.execute("TRUNCATE usage_events, customers, plans CASCADE")
     yield
 
 

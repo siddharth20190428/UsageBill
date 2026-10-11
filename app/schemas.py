@@ -2,10 +2,14 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from pydantic import AwareDatetime, BaseModel, Field
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
 
 class CustomerIn(BaseModel):
+    # Strip first, then check min_length, so a whitespace-only name is a 422 rather than
+    # slipping through and tripping the database CHECK constraint as a 500.
+    model_config = ConfigDict(str_strip_whitespace=True)
+
     name: str = Field(min_length=1, max_length=200)
 
 

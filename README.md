@@ -3,7 +3,7 @@
 A usage-based billing service. Customers send metered usage events; the service
 will price them (tiers, proration) and generate invoices that can never double-bill.
 
-**Status:** usage ingestion is done and tested. Pricing plans and invoice generation come next.
+**Status:** usage ingestion and tiered pricing plans are done and tested. Proration and invoice generation come next.
 
 ## Run it in GitHub Codespaces
 
@@ -54,7 +54,46 @@ curl -s -X POST localhost:8000/usage -H 'content-type: application/json' -d '{
 }'
 ```
 
+### Plans and quotes
+
+```bash
+# A plan: $20 base fee, first 100 units @ 0.10, up to 1000 @ 0.08, beyond that @ 0.05
+curl -s -X POST localhost:8000/plans -H 'content-type: application/json' -d '{
+  "name": "Growth",
+  "base_fee": "20.00",
+  "tiers": [
+    {"up_to": "100",  "unit_price": "0.10"},
+    {"up_to": "1000", "unit_price": "0.08"},
+    {"up_to": null,   "unit_price": "0.05"}
+  ]
+}'
+
+# What would 1,250 units cost? (100*0.10 + 900*0.08 + 250*0.05 + 20.00 = 114.50)
+curl -s -X POST localhost:8000/plans/<plan id>/quote -H 'content-type: application/json' \
+  -d '{"quantity": "1250"}'
+```
+
 ## Design decisions
+
+**Graduated tiers.** Each tier prices only the units that fall inside it, so 1,250 units are
+split 100 / 900 / 250 across the tiers above. A quantity exactly on a boundary belongs to the
+lower tier. The logic is a pure function in `app/pricing.py` (no database, no I/O), so the
+edge cases are unit-tested directly.
+
+**Rounding.** Each tier's charge is rounded once to the cent (half-up) and the total is the sum
+of those rounded lines, so an invoice always adds up exactly as printed. Half-cent amounts like
+1.005 round to 1.01, which binary floats get wrong (`round(1.005, 2) == 1.0`), another reason
+everything is `Decimal`.
+
+**Plans are immutable.** There is no update endpoint. Changing a price means creating a new plan,
+so an invoice recomputed later can never change because someone edited a price.
+
+**Create is all-or-nothing.** A plan and its tiers are written in one transaction, so a failure
+never leaves a plan without tiers or orphan tiers behind.
+
+**Validation in layers.** Malformed tiers (empty, out of order, bounded last tier, negative price)
+are rejected with a field-level 422 before anything is written. The database adds a backstop: a
+partial unique index allows at most one unbounded tier per plan.
 
 **Idempotency lives in the database.** `usage_events` has `UNIQUE (customer_id, idempotency_key)`
 and ingestion uses `INSERT ... ON CONFLICT DO NOTHING`. A "check if it exists, then insert" in
@@ -79,3 +118,5 @@ so a UI can show what to fix instead of a generic failure.
 - The schema is applied at startup with `CREATE TABLE IF NOT EXISTS`. A real deployment would use
   migrations (Alembic).
 - One metric per customer for now.
+- Amounts are rounded to 2 decimal places, which is right for USD/EUR/INR but not for currencies
+  with other minor units (e.g. JPY has none).

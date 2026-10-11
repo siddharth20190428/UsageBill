@@ -1,13 +1,15 @@
 from contextlib import asynccontextmanager
 from uuid import UUID
 
-from fastapi import Depends, FastAPI, Request, Response
+from fastapi import Depends, FastAPI, Response
 from psycopg.errors import ForeignKeyViolation
 from psycopg_pool import ConnectionPool
 
 from app import config
 from app.db import apply_schema, make_pool
+from app.deps import get_pool
 from app.errors import ApiError, register_error_handlers
+from app.plans import router as plans_router
 from app.schemas import CustomerIn, CustomerOut, UsageIn, UsageOut
 
 
@@ -22,10 +24,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="UsageBill", lifespan=lifespan)
 register_error_handlers(app)
-
-
-def get_pool(request: Request) -> ConnectionPool:
-    return request.app.state.pool
+app.include_router(plans_router)
 
 
 @app.get("/health")

@@ -141,3 +141,9 @@ def test_get_missing_customer_is_a_404(client):
     resp = client.get(f"/customers/{uuid4()}")
     assert resp.status_code == 404
     assert resp.json()["error"]["code"] == "customer_not_found"
+
+
+def test_whitespace_only_customer_name_is_a_422_not_a_500(client):
+    resp = client.post("/customers", json={"name": "   "})
+    assert resp.status_code == 422
+    assert resp.json()["error"]["details"][0]["field"] == "name"
