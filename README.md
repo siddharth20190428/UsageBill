@@ -4,6 +4,7 @@ A usage-based billing service. Customers send metered usage events; the service
 will price them (tiers, proration) and generate invoices that can never double-bill.
 
 **Status:** usage ingestion and tiered pricing plans are done and tested. Proration and invoice generation come next.
+See [docs/billing.md](docs/billing.md) for subscriptions and invoices.
 
 ## Run it in GitHub Codespaces
 

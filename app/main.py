@@ -10,6 +10,8 @@ from app.db import apply_schema, make_pool
 from app.deps import get_pool
 from app.errors import ApiError, register_error_handlers
 from app.plans import router as plans_router
+from app.invoices import router as invoices_router
+from app.subscriptions import router as subscriptions_router
 from app.schemas import CustomerIn, CustomerOut, UsageIn, UsageOut
 
 
@@ -25,6 +27,8 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="UsageBill", lifespan=lifespan)
 register_error_handlers(app)
 app.include_router(plans_router)
+app.include_router(subscriptions_router)
+app.include_router(invoices_router)
 
 
 @app.get("/health")
@@ -102,6 +106,20 @@ def ingest_usage(body: UsageIn, response: Response, pool: ConnectionPool = Depen
             )
 
         if created is not None:
+            # Usage for a month that has already been invoiced can no longer be billed, so refuse it
+            # rather than accept it and silently never charge for it. (A retry of an event we already
+            # recorded takes the duplicate path below and is still fine.) Raising rolls the insert back.
+            closed = conn.execute(
+                "SELECT 1 FROM invoices WHERE customer_id = %s AND period_start <= %s AND %s < period_end",
+                (body.customer_id, body.occurred_at, body.occurred_at),
+            ).fetchone()
+            if closed is not None:
+                raise ApiError(
+                    409,
+                    "billing_period_closed",
+                    "An invoice has already been issued for the month containing occurred_at.",
+                    "occurred_at",
+                )
             response.status_code = 201
             return {**created, "duplicate": False}
 
