@@ -14,9 +14,12 @@ def make_pool(database_url: str) -> ConnectionPool:
         min_size=1,
         max_size=10,
         kwargs={"row_factory": dict_row},
+        # Serverless Postgres (e.g. Neon) suspends idle compute and drops connections; test a connection
+        # before handing it out so the first request after a quiet period doesn't fail.
+        check=ConnectionPool.check_connection,
         open=False,
     )
-    pool.open(wait=True, timeout=10)
+    pool.open(wait=True, timeout=30)  # a cold database can take several seconds to wake
     return pool
 
 
