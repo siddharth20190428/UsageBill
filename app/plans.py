@@ -56,6 +56,24 @@ def create_plan(body: PlanIn, pool: ConnectionPool = Depends(get_pool)):
         return load_plan(conn, plan["id"])
 
 
+@router.get("", response_model=list[PlanOut])
+def list_plans(pool: ConnectionPool = Depends(get_pool)):
+    """All plans, newest first, each with its tiers in order."""
+    with pool.connection() as conn:
+        plans = conn.execute(
+            "SELECT id, name, currency, base_fee, created_at FROM plans ORDER BY created_at DESC, name"
+        ).fetchall()
+        tiers = conn.execute(
+            "SELECT plan_id, position, up_to, unit_price FROM plan_tiers ORDER BY plan_id, position"
+        ).fetchall()
+    by_plan: dict = {}
+    for t in tiers:
+        by_plan.setdefault(t["plan_id"], []).append(
+            {"position": t["position"], "up_to": t["up_to"], "unit_price": t["unit_price"]}
+        )
+    return [{**p, "tiers": by_plan.get(p["id"], [])} for p in plans]
+
+
 @router.get("/{plan_id}", response_model=PlanOut)
 def get_plan(plan_id: UUID, pool: ConnectionPool = Depends(get_pool)):
     with pool.connection() as conn:

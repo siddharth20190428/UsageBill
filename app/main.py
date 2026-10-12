@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 from uuid import UUID
 
-from fastapi import Depends, FastAPI, Response
+from fastapi import Depends, FastAPI, Query, Response
 from psycopg.errors import ForeignKeyViolation
 from psycopg_pool import ConnectionPool
 
@@ -12,7 +12,7 @@ from app.errors import ApiError, register_error_handlers
 from app.plans import router as plans_router
 from app.invoices import router as invoices_router
 from app.subscriptions import router as subscriptions_router
-from app.schemas import CustomerIn, CustomerOut, UsageIn, UsageOut
+from app.schemas import CustomerIn, CustomerOut, UsageEventOut, UsageIn, UsageOut
 
 
 @asynccontextmanager
@@ -49,6 +49,15 @@ def create_customer(body: CustomerIn, pool: ConnectionPool = Depends(get_pool)):
             (body.name.strip(),),
         ).fetchone()
     return row
+
+
+@app.get("/customers", response_model=list[CustomerOut])
+def list_customers(limit: int = Query(200, ge=1, le=500), pool: ConnectionPool = Depends(get_pool)):
+    """Newest first."""
+    with pool.connection() as conn:
+        return conn.execute(
+            "SELECT id, name, created_at FROM customers ORDER BY created_at DESC, id LIMIT %s", (limit,)
+        ).fetchall()
 
 
 @app.get("/customers/{customer_id}", response_model=CustomerOut)
@@ -134,3 +143,18 @@ def ingest_usage(body: UsageIn, response: Response, pool: ConnectionPool = Depen
             "idempotency_key",
         )
     return {**existing, "duplicate": True}
+
+
+@app.get("/customers/{customer_id}/usage", response_model=list[UsageEventOut])
+def list_usage(
+    customer_id: UUID, limit: int = Query(50, ge=1, le=500), pool: ConnectionPool = Depends(get_pool)
+):
+    """A customer's most recent usage events, by when they occurred."""
+    with pool.connection() as conn:
+        if conn.execute("SELECT 1 FROM customers WHERE id = %s", (customer_id,)).fetchone() is None:
+            raise ApiError(404, "customer_not_found", f"No customer with id {customer_id}", "customer_id")
+        return conn.execute(
+            "SELECT id, customer_id, quantity, occurred_at, idempotency_key, created_at "
+            "FROM usage_events WHERE customer_id = %s ORDER BY occurred_at DESC, created_at DESC LIMIT %s",
+            (customer_id, limit),
+        ).fetchall()

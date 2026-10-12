@@ -168,3 +168,28 @@ def get_invoice(invoice_id: UUID, pool: ConnectionPool = Depends(get_pool)):
     if invoice is None:
         raise ApiError(404, "invoice_not_found", f"No invoice with id {invoice_id}", "invoice_id")
     return invoice
+
+
+@router.get("/customers/{customer_id}/invoices", response_model=list[InvoiceOut])
+def list_customer_invoices(customer_id: UUID, pool: ConnectionPool = Depends(get_pool)):
+    """A customer's invoices, most recent month first, each with its lines."""
+    with pool.connection() as conn:
+        if conn.execute("SELECT 1 FROM customers WHERE id = %s", (customer_id,)).fetchone() is None:
+            raise ApiError(404, "customer_not_found", f"No customer with id {customer_id}", "customer_id")
+        invoices = conn.execute(
+            "SELECT id, customer_id, period_start, period_end, currency, total, created_at "
+            "FROM invoices WHERE customer_id = %s ORDER BY period_start DESC",
+            (customer_id,),
+        ).fetchall()
+        lines = conn.execute(
+            "SELECT l.invoice_id, l.position, l.kind, l.description, l.quantity, l.unit_price, l.amount "
+            "FROM invoice_lines l JOIN invoices i ON i.id = l.invoice_id "
+            "WHERE i.customer_id = %s ORDER BY l.invoice_id, l.position",
+            (customer_id,),
+        ).fetchall()
+    by_invoice: dict = {}
+    for line in lines:
+        by_invoice.setdefault(line["invoice_id"], []).append(
+            {k: line[k] for k in ("position", "kind", "description", "quantity", "unit_price", "amount")}
+        )
+    return [{**inv, "lines": by_invoice.get(inv["id"], [])} for inv in invoices]

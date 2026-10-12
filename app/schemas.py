@@ -36,3 +36,12 @@ class UsageOut(BaseModel):
     idempotency_key: str
     # True when this request was a retry of one we had already recorded.
     duplicate: bool
+
+
+class UsageEventOut(BaseModel):
+    id: UUID
+    customer_id: UUID
+    quantity: Decimal
+    occurred_at: datetime
+    idempotency_key: str
+    created_at: datetime
