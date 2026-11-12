@@ -1,76 +1,84 @@
-import { useState, type FormEvent } from "react";
+import { useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "../api/client";
-import { CustomerRow } from "../components/CustomerRow";
-import { Empty, ErrorNotice, Field, Loading, Notice } from "../components/ui";
+import type { Customer } from "../api/types";
+import { CustomerFormModal } from "../components/CustomerFormModal";
+import { IconPlus } from "../components/icons";
+import { ConfirmDialog, RowMenu } from "../components/overlay";
+import { Empty, ErrorNotice, Loading, Notice, PageHeader } from "../components/ui";
 import { useAsync } from "../hooks/useAsync";
-import { useSubmit } from "../hooks/useSubmit";
+import { formatUtc } from "../lib/dates";
 
 export function CustomersPage() {
   const customers = useAsync(() => api.listCustomers(), []);
-  const [name, setName] = useState("");
-  const [clientError, setClientError] = useState<string>();
-  const [created, setCreated] = useState<string>();
-  const create = useSubmit((n: string) => api.createCustomer(n));
+  const [creating, setCreating] = useState(false);
+  const [renaming, setRenaming] = useState<Customer>();
+  const [deleting, setDeleting] = useState<Customer>();
+  const [flash, setFlash] = useState<string>();
 
-  async function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    setCreated(undefined);
-    if (!name.trim()) {
-      setClientError("Enter a customer name.");
-      return;
-    }
-    setClientError(undefined);
-    const customer = await create.run(name.trim());
-    if (customer) {
-      setName("");
-      setCreated(customer.name);
-      customers.reload();
-    }
-  }
-
-  const fieldError = clientError ?? create.error?.fields.name;
+  const newButton = (
+    <button type="button" className="btn btn-primary" onClick={() => { setFlash(undefined); setCreating(true); }}>
+      <IconPlus /> New customer
+    </button>
+  );
 
   return (
     <>
-      <h1>Customers</h1>
+      <PageHeader title="Customers" actions={newButton} />
+      {flash && <Notice tone="success">{flash}</Notice>}
 
-      <form className="card stack" onSubmit={onSubmit} noValidate aria-label="New customer">
-        <h2>New customer</h2>
-        <Field id="customer-name" label="Name" error={fieldError}>
-          {(p) => (
-            <input
-              {...p}
-              value={name}
-              onChange={(e) => {
-                setName(e.target.value);
-                setClientError(undefined);
-              }}
-              autoComplete="off"
-            />
-          )}
-        </Field>
-        {create.error && !fieldError && <ErrorNotice error={create.error} />}
-        {created && <Notice tone="success">Created “{created}”.</Notice>}
-        <button className="btn btn-primary" type="submit" disabled={create.busy}>
-          {create.busy ? "Creating…" : "Create customer"}
-        </button>
-      </form>
-
-      <section className="card" aria-label="Customer list">
-        <h2>All customers</h2>
-        {customers.loading && !customers.data && <Loading label="Loading customers" />}
-        {customers.error && <ErrorNotice error={customers.error} onRetry={customers.reload} />}
+      <section className="panel" aria-label="Customer list">
+        {customers.loading && !customers.data && <div className="panel-body"><Loading label="Loading customers" /></div>}
+        {customers.error && <div className="panel-body"><ErrorNotice error={customers.error} onRetry={customers.reload} /></div>}
         {customers.data?.length === 0 && (
-          <Empty title="No customers yet">Create your first customer above to start recording usage.</Empty>
+          <div className="panel-body">
+            <Empty title="No customers yet">Add a customer to start recording their usage.</Empty>
+          </div>
         )}
         {customers.data && customers.data.length > 0 && (
-          <ul className="list">
-            {customers.data.map((c) => (
-              <CustomerRow key={c.id} customer={c} onChanged={customers.reload} />
-            ))}
-          </ul>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Customer</th><th>Created</th><th className="col-actions"><span className="sr-only">Actions</span></th></tr>
+              </thead>
+              <tbody>
+                {customers.data.map((c) => (
+                  <tr key={c.id}>
+                    <td>
+                      <Link to={`/customers/${c.id}`} className="cell-link">
+                        <span className="avatar" aria-hidden="true">{c.name.trim().charAt(0).toUpperCase()}</span>
+                        {c.name}
+                      </Link>
+                    </td>
+                    <td className="muted">{formatUtc(c.created_at)}</td>
+                    <td className="col-actions">
+                      <RowMenu label={`Actions for ${c.name}`} items={[
+                        { label: "Rename", onSelect: () => setRenaming(c) },
+                        { label: "Delete", danger: true, onSelect: () => setDeleting(c) },
+                      ]} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
+
+      {creating && (
+        <CustomerFormModal onClose={() => setCreating(false)}
+          onSaved={(c) => { setFlash(`Created “${c.name}”.`); customers.reload(); }} />
+      )}
+      {renaming && (
+        <CustomerFormModal customer={renaming} onClose={() => setRenaming(undefined)}
+          onSaved={(c) => { setFlash(`Renamed to “${c.name}”.`); customers.reload(); }} />
+      )}
+      {deleting && (
+        <ConfirmDialog title="Delete customer?" confirmLabel="Delete customer" onClose={() => setDeleting(undefined)}
+          onConfirm={async () => { await api.deleteCustomer(deleting.id); setFlash(`Deleted “${deleting.name}”.`); customers.reload(); }}>
+          This permanently deletes <strong>{deleting.name}</strong> and their usage and subscriptions. Customers with invoices can't be deleted.
+        </ConfirmDialog>
+      )}
     </>
   );
 }

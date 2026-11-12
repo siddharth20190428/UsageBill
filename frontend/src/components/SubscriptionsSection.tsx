@@ -4,7 +4,7 @@ import type { Subscription } from "../api/types";
 import { useAsync } from "../hooks/useAsync";
 import { useSubmit } from "../hooks/useSubmit";
 import { formatUtc, isValidLocalDateTime, nowAsLocalValue, toUtcIso } from "../lib/dates";
-import { Empty, ErrorNotice, Field, Loading, Notice } from "./ui";
+import { Empty, ErrorNotice, Field, Loading, Notice, Panel } from "./ui";
 
 function EndForm({ subscription, onEnded }: { subscription: Subscription; onEnded: () => void }) {
   const [open, setOpen] = useState(false);
@@ -14,7 +14,7 @@ function EndForm({ subscription, onEnded }: { subscription: Subscription; onEnde
 
   if (!open) {
     return (
-      <button type="button" className="btn btn-small" onClick={() => setOpen(true)}>
+      <button type="button" className="btn btn-quiet btn-small" onClick={() => setOpen(true)}>
         End…
       </button>
     );
@@ -80,8 +80,8 @@ export function SubscriptionsSection({ customerId }: { customerId: string }) {
   }
 
   return (
-    <section className="card stack" aria-label="Subscriptions">
-      <h2>Subscriptions</h2>
+    <Panel title="Subscriptions">
+     <div className="stack">
 
       {subs.loading && !subs.data && <Loading label="Loading subscriptions" />}
       {subs.error && <ErrorNotice error={subs.error} onRetry={subs.reload} />}
@@ -111,7 +111,7 @@ export function SubscriptionsSection({ customerId }: { customerId: string }) {
         </div>
       )}
 
-      <form className="stack" onSubmit={onSubmit} noValidate aria-label="Start subscription">
+      <form className="stack subform" onSubmit={onSubmit} noValidate aria-label="Start subscription">
         <h3>{hasCurrent ? "Change plan" : "Start a subscription"}</h3>
         {plans.error && <ErrorNotice error={plans.error} onRetry={plans.reload} />}
         {plans.data?.length === 0 && (
@@ -147,6 +147,7 @@ export function SubscriptionsSection({ customerId }: { customerId: string }) {
           </button>
         </div>
       </form>
-    </section>
+     </div>
+    </Panel>
   );
 }

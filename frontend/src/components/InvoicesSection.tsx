@@ -6,7 +6,7 @@ import { useSubmit } from "../hooks/useSubmit";
 import { formatMonth, previousMonth } from "../lib/dates";
 import { formatMoney } from "../lib/money";
 import { InvoiceView } from "./InvoiceView";
-import { Empty, ErrorNotice, Field, Loading, Notice } from "./ui";
+import { Empty, ErrorNotice, Field, Loading, Notice, Panel } from "./ui";
 
 export function InvoicesSection({ customerId }: { customerId: string }) {
   const invoices = useAsync(() => api.listInvoices(customerId), [customerId]);
@@ -31,9 +31,9 @@ export function InvoicesSection({ customerId }: { customerId: string }) {
   }
 
   return (
-    <section className="card stack" aria-label="Invoices">
-      <h2>Invoices</h2>
-      <form className="row" onSubmit={onSubmit} noValidate aria-label="Generate invoice">
+    <Panel title="Invoices">
+     <div className="stack">
+      <form className="inline-form" onSubmit={onSubmit} noValidate aria-label="Generate invoice">
         <Field
           id="invoice-period"
           label="Billing month (UTC)"
@@ -52,7 +52,7 @@ export function InvoicesSection({ customerId }: { customerId: string }) {
             />
           )}
         </Field>
-        <button className="btn btn-primary" type="submit" disabled={generate.busy} style={{ marginTop: 24 }}>
+        <button className="btn btn-primary" type="submit" disabled={generate.busy}>
           {generate.busy ? "Generating…" : "Generate invoice"}
         </button>
       </form>
@@ -77,13 +77,15 @@ export function InvoicesSection({ customerId }: { customerId: string }) {
       {invoices.error && <ErrorNotice error={invoices.error} onRetry={invoices.reload} />}
       {invoices.data?.length === 0 && <Empty title="No invoices yet">Generate one for a month that has ended.</Empty>}
       {invoices.data?.map((inv) => (
-        <details key={inv.id} open={outcome?.invoice.id === inv.id}>
+        <details className="invoice-row" key={inv.id} open={outcome?.invoice.id === inv.id}>
           <summary>
-            <strong>{formatMonth(inv.period_start)}</strong> — {formatMoney(inv.total, inv.currency)}
+            <span className="strong">{formatMonth(inv.period_start)}</span>
+            <span className="num strong">{formatMoney(inv.total, inv.currency)}</span>
           </summary>
           <InvoiceView invoice={inv} />
         </details>
       ))}
-    </section>
+     </div>
+    </Panel>
   );
 }

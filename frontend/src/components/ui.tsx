@@ -1,5 +1,4 @@
-import { useState, type ReactNode } from "react";
-import { useSubmit } from "../hooks/useSubmit";
+import type { ReactNode } from "react";
 import type { DescribedError } from "../lib/errors";
 
 /** A failure the person can act on: what happened, what to do, and (small) a code to quote. */
@@ -80,44 +79,26 @@ export function Field({
   );
 }
 
-/** Two-step delete: the first click only asks; nothing is sent until "Yes, delete". */
-export function DeleteButton({ what, onDelete }: { what: string; onDelete: () => Promise<void> }) {
-  const [asking, setAsking] = useState(false);
-  const del = useSubmit(onDelete);
-
-  if (!asking) {
-    return (
-      <button type="button" className="btn btn-small btn-danger" onClick={() => setAsking(true)} aria-label={`Delete ${what}`}>
-        Delete
-      </button>
-    );
-  }
+export function PageHeader({ title, back, actions }: { title: string; back?: ReactNode; actions?: ReactNode }) {
   return (
-    <div className="stack" role="group" aria-label={`Confirm deleting ${what}`}>
-      <span>Delete “{what}”? This can't be undone.</span>
-      {del.error && <ErrorNotice error={del.error} />}
-      <div className="row">
-        <button
-          type="button"
-          className="btn btn-small btn-danger"
-          disabled={del.busy}
-          onClick={async () => {
-            await del.run();
-          }}
-        >
-          {del.busy ? "Deleting…" : "Yes, delete"}
-        </button>
-        <button
-          type="button"
-          className="btn btn-small"
-          onClick={() => {
-            del.clearError();
-            setAsking(false);
-          }}
-        >
-          Cancel
-        </button>
+    <header className="page-head">
+      <div>
+        {back && <div className="crumb">{back}</div>}
+        <h1>{title}</h1>
       </div>
-    </div>
+      {actions && <div className="page-actions">{actions}</div>}
+    </header>
+  );
+}
+
+export function Panel({ title, actions, children, label }: { title: string; actions?: ReactNode; children: ReactNode; label?: string }) {
+  return (
+    <section className="panel" aria-label={label ?? title}>
+      <div className="panel-head">
+        <h2>{title}</h2>
+        {actions}
+      </div>
+      <div className="panel-body">{children}</div>
+    </section>
   );
 }

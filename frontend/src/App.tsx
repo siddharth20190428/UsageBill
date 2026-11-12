@@ -1,20 +1,26 @@
 import { NavLink, Navigate, Route, Routes } from "react-router-dom";
+import { IconPlans, IconUsers, LogoMark } from "./components/icons";
 import { CustomerPage } from "./pages/CustomerPage";
 import { CustomersPage } from "./pages/CustomersPage";
 import { PlansPage } from "./pages/PlansPage";
 
 export function App() {
   return (
-    <>
-      <header className="topbar">
-        <div className="topbar-inner">
-          <span className="brand">UsageBill</span>
-          <nav aria-label="Main">
-            <NavLink to="/customers">Customers</NavLink>
-            <NavLink to="/plans">Plans</NavLink>
-          </nav>
+    <div className="shell">
+      <aside className="sidebar">
+        <div className="brand">
+          <LogoMark />
+          <span>UsageBill</span>
         </div>
-      </header>
+        <nav aria-label="Main">
+          <NavLink to="/customers">
+            <IconUsers /> Customers
+          </NavLink>
+          <NavLink to="/plans">
+            <IconPlans /> Plans
+          </NavLink>
+        </nav>
+      </aside>
       <main className="page">
         <Routes>
           <Route path="/" element={<Navigate to="/customers" replace />} />
@@ -24,6 +30,6 @@ export function App() {
           <Route path="*" element={<p>Page not found. <NavLink to="/customers">Go to customers</NavLink></p>} />
         </Routes>
       </main>
-    </>
+    </div>
   );
 }

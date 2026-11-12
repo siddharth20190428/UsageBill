@@ -63,8 +63,7 @@ export function PlanForm({
   const hasFieldErrors = Object.keys(errors).length > 0;
 
   return (
-    <form className="card stack" onSubmit={onSubmit} noValidate aria-label={editing ? `Edit ${plan.name}` : "New plan"}>
-      <h2>{editing ? `Edit ${plan.name}` : "New plan"}</h2>
+    <form className="stack" onSubmit={onSubmit} noValidate aria-label={editing ? `Edit ${plan.name}` : "New plan"}>
       <p className="muted">
         {editing
           ? "Pricing can only be changed while no customer is subscribed to the plan; after that, only the name can change."
@@ -89,7 +88,7 @@ export function PlanForm({
         </Field>
       </div>
 
-      <fieldset className="stack" style={{ border: 0, padding: 0, margin: 0 }}>
+      <fieldset className="stack">
         <legend>
           <h3>Pricing tiers</h3>
         </legend>
@@ -131,9 +130,7 @@ export function PlanForm({
               <button type="button" className="btn btn-small remove" onClick={() => removeTier(i)}>
                 Remove
               </button>
-            ) : (
-              <span />
-            )}
+            ) : null}
           </div>
         ))}
         <div>
@@ -151,15 +148,15 @@ export function PlanForm({
           <strong>Please fix the highlighted fields</strong>
         </div>
       )}
-      <div className="row">
-        <button className="btn btn-primary" type="submit" disabled={create.busy}>
-          {create.busy ? (editing ? "Saving…" : "Creating…") : editing ? "Save changes" : "Create plan"}
-        </button>
+      <div className="modal-actions">
         {onCancel && (
           <button type="button" className="btn" onClick={onCancel}>
             Cancel
           </button>
         )}
+        <button className="btn btn-primary" type="submit" disabled={create.busy}>
+          {create.busy ? (editing ? "Saving…" : "Creating…") : editing ? "Save changes" : "Create plan"}
+        </button>
       </div>
     </form>
   );

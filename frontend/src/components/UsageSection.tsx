@@ -6,7 +6,7 @@ import { useSubmit } from "../hooks/useSubmit";
 import { formatUtc, isValidLocalDateTime, nowAsLocalValue, toUtcIso } from "../lib/dates";
 import { newIdempotencyKey } from "../lib/ids";
 import { formatQuantity, isDecimal, isZero } from "../lib/money";
-import { Empty, ErrorNotice, Field, Loading, Notice } from "./ui";
+import { Empty, ErrorNotice, Field, Loading, Notice, Panel } from "./ui";
 
 export function UsageSection({ customerId }: { customerId: string }) {
   const usage = useAsync(() => api.listUsage(customerId), [customerId]);
@@ -52,8 +52,8 @@ export function UsageSection({ customerId }: { customerId: string }) {
   }
 
   return (
-    <section className="card stack" aria-label="Usage">
-      <h2>Usage</h2>
+    <Panel title="Usage">
+     <div className="stack">
       <form className="stack" onSubmit={onSubmit} noValidate aria-label="Record usage">
         <div className="row">
           <Field id="usage-quantity" label="Quantity" error={errors.quantity}>
@@ -129,7 +129,7 @@ export function UsageSection({ customerId }: { customerId: string }) {
         </div>
       </form>
 
-      <h3>Recent usage</h3>
+      <h3 className="subhead">Recent usage</h3>
       {usage.loading && !usage.data && <Loading label="Loading usage" />}
       {usage.error && <ErrorNotice error={usage.error} onRetry={usage.reload} />}
       {usage.data?.length === 0 && <Empty title="No usage recorded yet">Events you record appear here.</Empty>}
@@ -157,6 +157,7 @@ export function UsageSection({ customerId }: { customerId: string }) {
           </table>
         </div>
       )}
-    </section>
+     </div>
+    </Panel>
   );
 }

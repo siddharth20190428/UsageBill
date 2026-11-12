@@ -5,7 +5,7 @@ import { formatMoney, formatQuantity, formatUnitPrice } from "../lib/money";
 export function InvoiceView({ invoice }: { invoice: Invoice }) {
   return (
     <div className="table-wrap">
-      <table aria-label={`Invoice for ${formatMonth(invoice.period_start)}`}>
+      <table className="ledger" aria-label={`Invoice for ${formatMonth(invoice.period_start)}`}>
         <thead>
           <tr>
             <th>Description</th>
