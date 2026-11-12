@@ -95,10 +95,14 @@ export const api = {
   listCustomers: () => data(request<Customer[]>("GET", "/customers")),
   getCustomer: (id: string) => data(request<Customer>("GET", `/customers/${id}`)),
   createCustomer: (name: string) => data(request<Customer>("POST", "/customers", { name })),
+  renameCustomer: (id: string, name: string) => data(request<Customer>("PATCH", `/customers/${id}`, { name })),
+  deleteCustomer: async (id: string): Promise<void> => void (await request<null>("DELETE", `/customers/${id}`)),
 
   // plans
   listPlans: () => data(request<Plan[]>("GET", "/plans")),
   createPlan: (plan: PlanInput) => data(request<Plan>("POST", "/plans", plan)),
+  updatePlan: (id: string, plan: PlanInput) => data(request<Plan>("PUT", `/plans/${id}`, plan)),
+  deletePlan: async (id: string): Promise<void> => void (await request<null>("DELETE", `/plans/${id}`)),
   quote: (planId: string, quantity: string) =>
     data(request<Quote>("POST", `/plans/${planId}/quote`, { quantity })),
 

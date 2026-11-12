@@ -6,7 +6,7 @@ from psycopg.errors import ForeignKeyViolation
 from psycopg_pool import ConnectionPool
 
 from app import config
-from app.db import apply_schema, make_pool
+from app.db import apply_schema, lock_customer, make_pool
 from app.deps import get_pool
 from app.errors import ApiError, register_error_handlers
 from app.plans import router as plans_router
@@ -69,6 +69,42 @@ def get_customer(customer_id: UUID, pool: ConnectionPool = Depends(get_pool)):
     if row is None:
         raise ApiError(404, "customer_not_found", f"No customer with id {customer_id}", "customer_id")
     return row
+
+
+@app.patch("/customers/{customer_id}", response_model=CustomerOut)
+def rename_customer(customer_id: UUID, body: CustomerIn, pool: ConnectionPool = Depends(get_pool)):
+    """Change a customer's name. The name is a label only: invoices are keyed by id, so nothing is re-billed."""
+    with pool.connection() as conn:
+        row = conn.execute(
+            "UPDATE customers SET name = %s WHERE id = %s RETURNING id, name, created_at",
+            (body.name.strip(), customer_id),
+        ).fetchone()
+    if row is None:
+        raise ApiError(404, "customer_not_found", f"No customer with id {customer_id}", "customer_id")
+    return row
+
+
+@app.delete("/customers/{customer_id}", status_code=204)
+def delete_customer(customer_id: UUID, pool: ConnectionPool = Depends(get_pool)):
+    """Delete a customer together with their usage and subscriptions, unless they have been invoiced.
+
+    Invoices are the permanent billing record, so a customer who has one cannot be deleted (409).
+    The per-customer lock makes this safe against a usage event or subscription arriving at the same
+    moment: they wait, then see the customer is gone and get a 404.
+    """
+    with pool.connection() as conn:
+        lock_customer(conn, customer_id)
+        invoices = conn.execute("SELECT count(*) AS n FROM invoices WHERE customer_id = %s", (customer_id,)).fetchone()["n"]
+        if invoices:
+            raise ApiError(
+                409,
+                "customer_has_invoices",
+                f"This customer has {invoices} invoice{'s' if invoices != 1 else ''}, which are permanent billing records.",
+            )
+        conn.execute("DELETE FROM usage_events WHERE customer_id = %s", (customer_id,))
+        conn.execute("DELETE FROM subscriptions WHERE customer_id = %s", (customer_id,))
+        conn.execute("DELETE FROM customers WHERE id = %s", (customer_id,))
+    return Response(status_code=204)
 
 
 # --------------------------------------------------------------------------

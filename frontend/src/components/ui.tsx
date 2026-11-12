@@ -1,4 +1,5 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { useSubmit } from "../hooks/useSubmit";
 import type { DescribedError } from "../lib/errors";
 
 /** A failure the person can act on: what happened, what to do, and (small) a code to quote. */
@@ -75,6 +76,48 @@ export function Field({
           </p>
         )
       )}
+    </div>
+  );
+}
+
+/** Two-step delete: the first click only asks; nothing is sent until "Yes, delete". */
+export function DeleteButton({ what, onDelete }: { what: string; onDelete: () => Promise<void> }) {
+  const [asking, setAsking] = useState(false);
+  const del = useSubmit(onDelete);
+
+  if (!asking) {
+    return (
+      <button type="button" className="btn btn-small btn-danger" onClick={() => setAsking(true)} aria-label={`Delete ${what}`}>
+        Delete
+      </button>
+    );
+  }
+  return (
+    <div className="stack" role="group" aria-label={`Confirm deleting ${what}`}>
+      <span>Delete “{what}”? This can't be undone.</span>
+      {del.error && <ErrorNotice error={del.error} />}
+      <div className="row">
+        <button
+          type="button"
+          className="btn btn-small btn-danger"
+          disabled={del.busy}
+          onClick={async () => {
+            await del.run();
+          }}
+        >
+          {del.busy ? "Deleting…" : "Yes, delete"}
+        </button>
+        <button
+          type="button"
+          className="btn btn-small"
+          onClick={() => {
+            del.clearError();
+            setAsking(false);
+          }}
+        >
+          Cancel
+        </button>
+      </div>
     </div>
   );
 }

@@ -57,4 +57,75 @@ describe("CustomersPage", () => {
     expect(await screen.findByText("Can't reach the server")).toBeInTheDocument();
     expect(screen.getByText(/uvicorn/)).toBeInTheDocument();
   });
+
+  describe("edit and delete", () => {
+    const acme = { id: "c1", name: "Acme", created_at: "2025-09-16T00:00:00Z" };
+
+    it("renames a customer inline", async () => {
+      let current = acme;
+      const api = mockApi({
+        "GET /customers": () => ({ body: [current] }),
+        "PATCH /customers/c1": (b) => {
+          current = { ...acme, name: (b as { name: string }).name };
+          return { body: current };
+        },
+      });
+      renderPage();
+      await userEvent.click(await screen.findByRole("button", { name: "Edit Acme" }));
+      const input = screen.getByLabelText("Name", { selector: "#rename-c1" });
+      expect(input).toHaveValue("Acme");
+      await userEvent.clear(input);
+      await userEvent.type(input, "Acme Corp");
+      await userEvent.click(screen.getByRole("button", { name: "Save" }));
+      expect(await screen.findByRole("link", { name: "Acme Corp" })).toBeInTheDocument();
+      expect(api.calls.find((c) => c.key === "PATCH /customers/c1")?.body).toEqual({ name: "Acme Corp" });
+    });
+
+    it("won't save a blank name", async () => {
+      const api = mockApi({ "GET /customers": () => ({ body: [acme] }) });
+      renderPage();
+      await userEvent.click(await screen.findByRole("button", { name: "Edit Acme" }));
+      await userEvent.clear(screen.getByLabelText("Name", { selector: "#rename-c1" }));
+      await userEvent.click(screen.getByRole("button", { name: "Save" }));
+      expect(screen.getByText("Enter a customer name.")).toBeInTheDocument();
+      expect(api.count("PATCH /customers/c1")).toBe(0);
+    });
+
+    it("asks before deleting, and sends nothing until confirmed", async () => {
+      let list = [acme];
+      const api = mockApi({
+        "GET /customers": () => ({ body: list }),
+        "DELETE /customers/c1": () => {
+          list = [];
+          return { status: 204 };
+        },
+      });
+      renderPage();
+      await userEvent.click(await screen.findByRole("button", { name: "Delete Acme" }));
+      expect(screen.getByText(/This can't be undone/)).toBeInTheDocument();
+      expect(api.count("DELETE /customers/c1")).toBe(0);
+
+      await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+      expect(screen.queryByText(/This can't be undone/)).not.toBeInTheDocument();
+      expect(api.count("DELETE /customers/c1")).toBe(0);
+
+      await userEvent.click(screen.getByRole("button", { name: "Delete Acme" }));
+      await userEvent.click(screen.getByRole("button", { name: "Yes, delete" }));
+      expect(await screen.findByText("No customers yet")).toBeInTheDocument();
+      expect(api.count("DELETE /customers/c1")).toBe(1);
+    });
+
+    it("explains why an invoiced customer can't be deleted and keeps the row", async () => {
+      mockApi({
+        "GET /customers": () => ({ body: [acme] }),
+        "DELETE /customers/c1": () => apiError(409, "customer_has_invoices", "This customer has 2 invoices, which are permanent billing records."),
+      });
+      renderPage();
+      await userEvent.click(await screen.findByRole("button", { name: "Delete Acme" }));
+      await userEvent.click(screen.getByRole("button", { name: "Yes, delete" }));
+      expect(await screen.findByText("This customer has been invoiced")).toBeInTheDocument();
+      expect(screen.getByText(/2 invoices/)).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Acme" })).toBeInTheDocument();
+    });
+  });
 });

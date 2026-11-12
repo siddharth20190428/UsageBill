@@ -34,7 +34,8 @@ def start_subscription(customer_id: UUID, body: SubscriptionIn, pool: Connection
     with pool.connection() as conn:
         lock_customer(conn, customer_id)
 
-        plan = conn.execute("SELECT id FROM plans WHERE id = %s", (body.plan_id,)).fetchone()
+        # FOR KEY SHARE: a concurrent plan edit/delete (which locks the row FOR UPDATE) waits for us, and vice versa.
+        plan = conn.execute("SELECT id FROM plans WHERE id = %s FOR KEY SHARE", (body.plan_id,)).fetchone()
         if plan is None:
             raise ApiError(404, "plan_not_found", f"No plan with id {body.plan_id}", "plan_id")
 

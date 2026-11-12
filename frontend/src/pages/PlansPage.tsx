@@ -14,7 +14,7 @@ export function PlansPage() {
       <h1>Plans</h1>
       <PlanForm
         onAttempt={() => setCreated(undefined)}
-        onCreated={(plan) => {
+        onSaved={(plan) => {
           setCreated(plan.name);
           plans.reload();
         }}
@@ -29,7 +29,7 @@ export function PlansPage() {
         {plans.data && plans.data.length > 0 && (
           <ul className="list">
             {plans.data.map((p) => (
-              <PlanCard key={p.id} plan={p} />
+              <PlanCard key={p.id} plan={p} onChanged={plans.reload} />
             ))}
           </ul>
         )}

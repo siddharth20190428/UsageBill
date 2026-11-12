@@ -37,4 +37,21 @@ describe("api client", () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
     await expect(api.listCustomers()).rejects.toBeInstanceOf(NetworkError);
   });
+
+  it("treats a 204 delete (empty body) as success", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(api.deleteCustomer("c1")).resolves.toBeUndefined();
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/customers/c1");
+    expect(fetchMock.mock.calls[0][1].method).toBe("DELETE");
+  });
+
+  it("sends edits as PATCH (customer) and PUT (plan)", async () => {
+    const fetchMock = vi.fn().mockImplementation(async () => new Response(JSON.stringify({ id: "x" }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await api.renameCustomer("c1", "New");
+    await api.updatePlan("p1", { name: "N", currency: "USD", base_fee: "0", tiers: [] });
+    expect(fetchMock.mock.calls.map((c) => c[1].method)).toEqual(["PATCH", "PUT"]);
+    expect(fetchMock.mock.calls[1][0]).toBe("/api/plans/p1");
+  });
 });

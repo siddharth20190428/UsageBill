@@ -19,8 +19,8 @@ In Codespaces, open the forwarded port 5173. To point at another API set `VITE_A
 
 ## Pages
 
-- **Customers**: list, create (blank/whitespace names rejected before any request).
-- **Plans**: create with a tier editor, readable tier summary, and a price calculator (calls `/plans/{id}/quote`).
+- **Customers**: list, create, rename inline, delete (two-step confirm; refused with an explanation if the customer has invoices). Blank names are rejected before any request.
+- **Plans**: create, edit and delete (pricing is editable only while no customer is subscribed; the UI explains the `plan_in_use` refusal), with a tier editor, readable tier summary, and a price calculator (calls `/plans/{id}/quote`).
 - **Customer**: subscriptions (start / change plan / end), usage (record, retry, history), invoices (generate, list).
 
 ## Design decisions

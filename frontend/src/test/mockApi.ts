@@ -13,7 +13,7 @@ export function mockApi(routes: Record<string, Handler>) {
     const handler = routes[key];
     if (!handler) return new Response(JSON.stringify({ error: { code: "not_found", message: `no mock for ${key}` } }), { status: 404 });
     const r = await handler(body, url);
-    return new Response(r.body === undefined ? "" : JSON.stringify(r.body), { status: r.status ?? 200 });
+    return new Response(r.body === undefined ? null : JSON.stringify(r.body), { status: r.status ?? 200 });
   });
   vi.stubGlobal("fetch", fn);
   return { calls, count: (key: string) => calls.filter((c) => c.key === key).length };

@@ -25,8 +25,9 @@ CREATE TABLE IF NOT EXISTS usage_events (
 CREATE INDEX IF NOT EXISTS usage_events_customer_time_idx
     ON usage_events (customer_id, occurred_at);
 
--- Plans are immutable once created. Changing a price means creating a new plan, so an
--- invoice recomputed later can never silently change because someone edited a price.
+-- A plan that customers are subscribed to is immutable apart from its name. Changing a price
+-- means creating a new plan, so usage that has not been invoiced yet can never be silently
+-- re-priced. (A plan nobody uses yet can still be edited or deleted; see app/plans.py.)
 CREATE TABLE IF NOT EXISTS plans (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name        TEXT NOT NULL UNIQUE CHECK (length(btrim(name)) > 0),

@@ -1,14 +1,29 @@
-import { useState, type FormEvent } from "react";
+import { useId, useState, type FormEvent } from "react";
 import { api } from "../api/client";
 import type { Plan } from "../api/types";
 import { useSubmit } from "../hooks/useSubmit";
-import { emptyPlanForm, toPlanPayload, validatePlanForm, type PlanFormState } from "../lib/planForm";
+import { emptyPlanForm, planToForm, toPlanPayload, validatePlanForm, type PlanFormState } from "../lib/planForm";
 import { ErrorNotice, Field } from "./ui";
 
-export function PlanForm({ onCreated, onAttempt }: { onCreated: (plan: Plan) => void; onAttempt?: () => void }) {
-  const [form, setForm] = useState<PlanFormState>(emptyPlanForm);
+/** Create a plan, or (when `plan` is given) edit it. */
+export function PlanForm({
+  plan,
+  onSaved,
+  onAttempt,
+  onCancel,
+}: {
+  plan?: Plan;
+  onSaved: (plan: Plan) => void;
+  onAttempt?: () => void;
+  onCancel?: () => void;
+}) {
+  const editing = plan !== undefined;
+  const uid = useId(); // unique per form instance: the create and edit forms can be on screen together
+  const [form, setForm] = useState<PlanFormState>(() => (plan ? planToForm(plan) : emptyPlanForm()));
   const [clientErrors, setClientErrors] = useState<Record<string, string>>({});
-  const create = useSubmit((f: PlanFormState) => api.createPlan(toPlanPayload(f)));
+  const create = useSubmit((f: PlanFormState) =>
+    plan ? api.updatePlan(plan.id, toPlanPayload(f)) : api.createPlan(toPlanPayload(f)),
+  );
 
   const errors = { ...(create.error?.fields ?? {}), ...clientErrors };
   const last = form.tiers.length - 1;
@@ -38,24 +53,28 @@ export function PlanForm({ onCreated, onAttempt }: { onCreated: (plan: Plan) => 
     const found = validatePlanForm(form);
     setClientErrors(found);
     if (Object.keys(found).length > 0) return;
-    const plan = await create.run(form);
-    if (plan) {
-      setForm(emptyPlanForm());
-      onCreated(plan);
+    const saved = await create.run(form);
+    if (saved) {
+      if (!editing) setForm(emptyPlanForm());
+      onSaved(saved);
     }
   }
 
   const hasFieldErrors = Object.keys(errors).length > 0;
 
   return (
-    <form className="card stack" onSubmit={onSubmit} noValidate aria-label="New plan">
-      <h2>New plan</h2>
-      <p className="muted">Plans can't be edited once created. To change pricing, create a new plan.</p>
+    <form className="card stack" onSubmit={onSubmit} noValidate aria-label={editing ? `Edit ${plan.name}` : "New plan"}>
+      <h2>{editing ? `Edit ${plan.name}` : "New plan"}</h2>
+      <p className="muted">
+        {editing
+          ? "Pricing can only be changed while no customer is subscribed to the plan; after that, only the name can change."
+          : "Once a customer subscribes, a plan's pricing is locked. For new pricing, create a new plan."}
+      </p>
       <div className="row">
-        <Field id="plan-name" label="Name" error={errors.name}>
+        <Field id={`${uid}-name`} label="Name" error={errors.name}>
           {(p) => <input {...p} value={form.name} onChange={(e) => patch({ name: e.target.value })} autoComplete="off" />}
         </Field>
-        <Field id="plan-currency" label="Currency" error={errors.currency}>
+        <Field id={`${uid}-currency`} label="Currency" error={errors.currency}>
           {(p) => (
             <input
               {...p}
@@ -65,7 +84,7 @@ export function PlanForm({ onCreated, onAttempt }: { onCreated: (plan: Plan) => 
             />
           )}
         </Field>
-        <Field id="plan-base-fee" label="Monthly base fee" error={errors.base_fee} hint="Charged every month.">
+        <Field id={`${uid}-base-fee`} label="Monthly base fee" error={errors.base_fee} hint="Charged every month.">
           {(p) => <input {...p} inputMode="decimal" value={form.base_fee} onChange={(e) => patch({ base_fee: e.target.value })} />}
         </Field>
       </div>
@@ -81,7 +100,7 @@ export function PlanForm({ onCreated, onAttempt }: { onCreated: (plan: Plan) => 
         {form.tiers.map((tier, i) => (
           <div className="tier-row" key={i}>
             <Field
-              id={`tier-${i}-up-to`}
+              id={`${uid}-tier-${i}-up-to`}
               label={`Tier ${i + 1} up to`}
               error={errors[`tiers.${i}.up_to`]}
               hint={i === last ? "No limit" : undefined}
@@ -97,7 +116,7 @@ export function PlanForm({ onCreated, onAttempt }: { onCreated: (plan: Plan) => 
                 />
               )}
             </Field>
-            <Field id={`tier-${i}-price`} label={`Tier ${i + 1} price per unit`} error={errors[`tiers.${i}.unit_price`]}>
+            <Field id={`${uid}-tier-${i}-price`} label={`Tier ${i + 1} price per unit`} error={errors[`tiers.${i}.unit_price`]}>
               {(p) => (
                 <input
                   {...p}
@@ -132,9 +151,16 @@ export function PlanForm({ onCreated, onAttempt }: { onCreated: (plan: Plan) => 
           <strong>Please fix the highlighted fields</strong>
         </div>
       )}
-      <button className="btn btn-primary" type="submit" disabled={create.busy}>
-        {create.busy ? "Creating…" : "Create plan"}
-      </button>
+      <div className="row">
+        <button className="btn btn-primary" type="submit" disabled={create.busy}>
+          {create.busy ? (editing ? "Saving…" : "Creating…") : editing ? "Save changes" : "Create plan"}
+        </button>
+        {onCancel && (
+          <button type="button" className="btn" onClick={onCancel}>
+            Cancel
+          </button>
+        )}
+      </div>
     </form>
   );
 }

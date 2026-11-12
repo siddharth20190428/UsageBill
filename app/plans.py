@@ -1,7 +1,7 @@
 from decimal import Decimal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 from psycopg.errors import UniqueViolation
 from psycopg_pool import ConnectionPool
 
@@ -78,6 +78,74 @@ def list_plans(pool: ConnectionPool = Depends(get_pool)):
 def get_plan(plan_id: UUID, pool: ConnectionPool = Depends(get_pool)):
     with pool.connection() as conn:
         return plan_or_404(conn, plan_id)
+
+
+def _lock_plan(conn, plan_id: UUID) -> dict:
+    """Lock the plan row (404 if missing). Conflicts with the key-share lock a new subscription takes."""
+    row = conn.execute("SELECT id FROM plans WHERE id = %s FOR UPDATE", (plan_id,)).fetchone()
+    if row is None:
+        raise ApiError(404, "plan_not_found", f"No plan with id {plan_id}", "plan_id")
+    return load_plan(conn, plan_id)
+
+
+def _subscription_count(conn, plan_id: UUID) -> int:
+    return conn.execute("SELECT count(*) AS n FROM subscriptions WHERE plan_id = %s", (plan_id,)).fetchone()["n"]
+
+
+def _pricing_changed(existing: dict, body: PlanIn) -> bool:
+    old = (existing["currency"], existing["base_fee"], [(t["up_to"], t["unit_price"]) for t in existing["tiers"]])
+    new = (body.currency, body.base_fee, [(t.up_to, t.unit_price) for t in body.tiers])
+    return old != new  # Decimal compares by value, so 0.1 == 0.100000
+
+
+@router.put("/{plan_id}", response_model=PlanOut)
+def update_plan(plan_id: UUID, body: PlanIn, pool: ConnectionPool = Depends(get_pool)):
+    """Edit a plan.
+
+    Prices are only editable while no customer is subscribed to the plan. Once a plan is in use,
+    changing its prices would silently re-price usage that has not been invoiced yet, so only the
+    name can change (409 plan_in_use otherwise): create a new plan for new pricing.
+    """
+    with pool.connection() as conn:
+        existing = _lock_plan(conn, plan_id)
+        in_use = _subscription_count(conn, plan_id)
+        if in_use and _pricing_changed(existing, body):
+            raise ApiError(
+                409,
+                "plan_in_use",
+                f"{in_use} subscription{'s use' if in_use != 1 else ' uses'} this plan, so its pricing can't change.",
+            )
+        try:
+            conn.execute(
+                "UPDATE plans SET name = %s, currency = %s, base_fee = %s WHERE id = %s",
+                (body.name, body.currency, body.base_fee, plan_id),
+            )
+        except UniqueViolation:
+            raise ApiError(409, "plan_name_taken", f"A plan named '{body.name}' already exists", "name")
+        if not in_use:
+            conn.execute("DELETE FROM plan_tiers WHERE plan_id = %s", (plan_id,))
+            with conn.cursor() as cur:
+                cur.executemany(
+                    "INSERT INTO plan_tiers (plan_id, position, up_to, unit_price) VALUES (%s, %s, %s, %s)",
+                    [(plan_id, i, t.up_to, t.unit_price) for i, t in enumerate(body.tiers, start=1)],
+                )
+        return load_plan(conn, plan_id)
+
+
+@router.delete("/{plan_id}", status_code=204)
+def delete_plan(plan_id: UUID, pool: ConnectionPool = Depends(get_pool)):
+    """Delete a plan nobody is subscribed to (409 plan_in_use otherwise)."""
+    with pool.connection() as conn:
+        _lock_plan(conn, plan_id)
+        in_use = _subscription_count(conn, plan_id)
+        if in_use:
+            raise ApiError(
+                409,
+                "plan_in_use",
+                f"{in_use} subscription{'s use' if in_use != 1 else ' uses'} this plan, so it can't be deleted.",
+            )
+        conn.execute("DELETE FROM plans WHERE id = %s", (plan_id,))  # tiers cascade
+    return Response(status_code=204)
 
 
 @router.post("/{plan_id}/quote", response_model=QuoteOut)

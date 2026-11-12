@@ -51,7 +51,15 @@ const KNOWN: Record<string, Known> = {
   },
   plan_name_taken: {
     title: "That plan name is already taken",
-    hint: "Plans can't be edited, so give the new version a new name.",
+    hint: "Choose a different name.",
+  },
+  plan_in_use: {
+    title: "This plan is in use",
+    hint: "Customers are subscribed to it, so its prices can't change and it can't be deleted. Only the name can be edited; for new pricing, create a new plan and move customers to it.",
+  },
+  customer_has_invoices: {
+    title: "This customer has been invoiced",
+    hint: "Invoices are permanent billing records, so the customer can't be deleted. You can still rename them.",
   },
   customer_not_found: { title: "That customer no longer exists", hint: "Go back to the customer list and refresh." },
   plan_not_found: { title: "That plan no longer exists", hint: "Refresh the page and pick another plan." },

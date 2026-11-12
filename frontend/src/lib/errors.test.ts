@@ -25,7 +25,7 @@ describe("describeError", () => {
   it("gives known codes a title and a next step, and shows the field inline", () => {
     const d = describeError(new ApiError(409, "plan_name_taken", "Plan name 'Pro' already exists", "name"));
     expect(d.title).toBe("That plan name is already taken");
-    expect(d.hint).toMatch(/new name/);
+    expect(d.hint).toMatch(/different name/);
     expect(d.detail).toMatch(/already exists/);
     expect(d.fields.name).toMatch(/already exists/);
   });

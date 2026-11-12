@@ -89,6 +89,6 @@ printed lines.
 
 - Proration is by time, not by billable days; a subscription changing three times in a month can differ from the
   full fee by a cent or two of rounding.
-- Plans cannot be edited (create a new one), and there are no credit notes or invoice corrections yet.
+- A plan in use by any subscription can only be renamed (new pricing needs a new plan), a customer with an invoice cannot be deleted, and there are no credit notes or invoice corrections yet.
 - Rounding is to 2 decimal places, which is wrong for currencies with other minor units.
 - Billing is always calendar months in UTC.

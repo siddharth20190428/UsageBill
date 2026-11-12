@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { emptyPlanForm, toPlanPayload, validatePlanForm, type PlanFormState } from "./planForm";
+import { emptyPlanForm, planToForm, toPlanPayload, validatePlanForm, type PlanFormState } from "./planForm";
 
 const valid = (): PlanFormState => ({
   name: " Pro ",
@@ -77,5 +77,24 @@ describe("toPlanPayload", () => {
         { up_to: null, unit_price: "0.01" },
       ],
     });
+  });
+});
+
+describe("planToForm", () => {
+  it("prefills from a stored plan, round-tripping to an identical payload", () => {
+    const stored = {
+      id: "p1", name: "Pro", currency: "USD", base_fee: "49.00", created_at: "x",
+      tiers: [
+        { position: 1, up_to: "1000.000000", unit_price: "0.100000" },
+        { position: 2, up_to: null, unit_price: "0.050000" },
+      ],
+    };
+    const form = planToForm(stored);
+    expect(form).toEqual({
+      name: "Pro", currency: "USD", base_fee: "49.00",
+      tiers: [{ up_to: "1000", unit_price: "0.10" }, { up_to: "", unit_price: "0.05" }],
+    });
+    expect(validatePlanForm(form)).toEqual({});
+    expect(toPlanPayload(form).tiers).toEqual([{ up_to: "1000", unit_price: "0.10" }, { up_to: null, unit_price: "0.05" }]);
   });
 });

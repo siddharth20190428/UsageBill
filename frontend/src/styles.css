@@ -83,3 +83,6 @@ details > summary { cursor: pointer; padding: 6px 0; }
 .tiers li { padding: 2px 0; }
 legend { padding: 0; margin-bottom: 8px; }
 fieldset { min-width: 0; }
+.btn-danger { color: var(--danger); border-color: var(--danger); }
+.btn-danger:disabled { opacity: .55; }
+.actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }

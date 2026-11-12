@@ -3,7 +3,8 @@ import { api } from "../api/client";
 import type { Plan, Quote } from "../api/types";
 import { useSubmit } from "../hooks/useSubmit";
 import { formatMoney, formatQuantity, formatUnitPrice, isDecimal } from "../lib/money";
-import { ErrorNotice, Field } from "./ui";
+import { PlanForm } from "./PlanForm";
+import { DeleteButton, ErrorNotice, Field } from "./ui";
 
 export function tierSummary(plan: Plan): string[] {
   let from = "0";
@@ -16,7 +17,8 @@ export function tierSummary(plan: Plan): string[] {
   });
 }
 
-export function PlanCard({ plan }: { plan: Plan }) {
+export function PlanCard({ plan, onChanged }: { plan: Plan; onChanged: () => void }) {
+  const [editing, setEditing] = useState(false);
   const [quantity, setQuantity] = useState("");
   const [clientError, setClientError] = useState<string>();
   const [quote, setQuote] = useState<Quote>();
@@ -34,6 +36,21 @@ export function PlanCard({ plan }: { plan: Plan }) {
     if (result) setQuote(result);
   }
 
+  if (editing) {
+    return (
+      <li>
+        <PlanForm
+          plan={plan}
+          onCancel={() => setEditing(false)}
+          onSaved={() => {
+            setEditing(false);
+            onChanged();
+          }}
+        />
+      </li>
+    );
+  }
+
   return (
     <li className="stack">
       <div className="spread">
@@ -41,6 +58,18 @@ export function PlanCard({ plan }: { plan: Plan }) {
         <span className="muted">
           {plan.currency} · base fee {formatMoney(plan.base_fee, plan.currency)} / month
         </span>
+      </div>
+      <div className="actions">
+        <button type="button" className="btn btn-small" onClick={() => setEditing(true)} aria-label={`Edit ${plan.name}`}>
+          Edit
+        </button>
+        <DeleteButton
+          what={plan.name}
+          onDelete={async () => {
+            await api.deletePlan(plan.id);
+            onChanged();
+          }}
+        />
       </div>
       <ul className="tiers" aria-label={`${plan.name} tiers`}>
         {tierSummary(plan).map((line) => (

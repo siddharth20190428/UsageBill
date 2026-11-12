@@ -1,5 +1,5 @@
-import type { PlanInput } from "../api/types";
-import { compareDecimal, isDecimal, isZero } from "./money";
+import type { Plan, PlanInput } from "../api/types";
+import { compareDecimal, isDecimal, isZero, trimDecimals } from "./money";
 
 export interface TierRow {
   up_to: string; // blank on the last tier = unbounded
@@ -18,6 +18,17 @@ export const emptyPlanForm = (): PlanFormState => ({
   currency: "USD",
   base_fee: "0",
   tiers: [{ up_to: "", unit_price: "" }],
+});
+
+/** Prefill the form from a stored plan ("0.100000" -> "0.10", last tier's null limit -> blank). */
+export const planToForm = (plan: Plan): PlanFormState => ({
+  name: plan.name,
+  currency: plan.currency,
+  base_fee: trimDecimals(plan.base_fee, 2),
+  tiers: plan.tiers.map((t) => ({
+    up_to: t.up_to === null ? "" : trimDecimals(t.up_to),
+    unit_price: trimDecimals(t.unit_price, 2),
+  })),
 });
 
 /**

@@ -1,10 +1,9 @@
 import { useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
 import { api } from "../api/client";
+import { CustomerRow } from "../components/CustomerRow";
 import { Empty, ErrorNotice, Field, Loading, Notice } from "../components/ui";
 import { useAsync } from "../hooks/useAsync";
 import { useSubmit } from "../hooks/useSubmit";
-import { formatUtc } from "../lib/dates";
 
 export function CustomersPage() {
   const customers = useAsync(() => api.listCustomers(), []);
@@ -67,10 +66,7 @@ export function CustomersPage() {
         {customers.data && customers.data.length > 0 && (
           <ul className="list">
             {customers.data.map((c) => (
-              <li key={c.id} className="spread">
-                <Link to={`/customers/${c.id}`}>{c.name}</Link>
-                <span className="muted">Created {formatUtc(c.created_at)}</span>
-              </li>
+              <CustomerRow key={c.id} customer={c} onChanged={customers.reload} />
             ))}
           </ul>
         )}
